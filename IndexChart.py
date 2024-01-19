@@ -9,6 +9,8 @@ import time
 import pybithumb
 from PyQt5.QtCore import QThread, pyqtSignal
 import pyupbit
+from collections import deque
+
 
 class PriceWorker(QThread):
     dataSent = pyqtSignal(float)
@@ -20,12 +22,13 @@ class PriceWorker(QThread):
 
     def run(self):
         while self.alive:
-            data  = pyupbit.get_current_price(self.ticker)
-            time.sleep(1)
+            data = pyupbit.get_current_price(self.ticker)
             self.dataSent.emit(data)
 
     def close(self):
         self.alive = False
+
+
 # ------------------------------------------
 
 class ChartWidget(QWidget):
@@ -36,6 +39,7 @@ class ChartWidget(QWidget):
         self.viewLimit = 128
 
         self.priceData = QLineSeries()
+        self.container = deque()
         self.priceChart = QChart()
         self.priceChart.addSeries(self.priceData)
         self.priceChart.legend().hide()
@@ -46,7 +50,6 @@ class ChartWidget(QWidget):
         dt = QDateTime.currentDateTime()
         axisX.setRange(dt, dt.addSecs(self.viewLimit))
         axisY = QValueAxis()
-
 
         self.priceChart.addAxis(axisX, Qt.AlignBottom)
         self.priceChart.addAxis(axisY, Qt.AlignRight)
@@ -64,18 +67,29 @@ class ChartWidget(QWidget):
         # ------------------------------------------
 
     def appendData(self, currPrice):
-        high = low = close = open = currPrice
+        if len(self.container) ==0:
+            high = low = open = currPrice
 
-        if len(self.priceData) == self.viewLimit :
+        self.container.append(currPrice)
+        if (currPrice > max(self.container)):
+            high = currPrice
+        elif (currPrice<min(self.container)):
+            low = currPrice
+
+
+        if len(self.priceData) == self.viewLimit:
             self.priceData.remove(0)
+            self.container.remove(0)
+            open = self.container[0]
+
         dt = QDateTime.currentDateTime()
-        self.priceData.append(dt.toMSecsSinceEpoch(), currPrice)
+        self.priceData.append(dt.toMSecsSinceEpoch(), (currPrice-open)/(high-low+1e3)*100)
         self.__updateAxis()
 
     def __updateAxis(self):
         pvs = self.priceData.pointsVector()
         dtStart = QDateTime.fromMSecsSinceEpoch(int(pvs[0].x()))
-        if len(self.priceData) == self.viewLimit :
+        if len(self.priceData) == self.viewLimit:
             dtLast = QDateTime.fromMSecsSinceEpoch(int(pvs[-1].x()))
         else:
             dtLast = dtStart.addSecs(self.viewLimit)
@@ -86,9 +100,10 @@ class ChartWidget(QWidget):
         dataY = [v.y() for v in pvs]
         ay.setRange(min(dataY), max(dataY))
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication
+
     app = QApplication(sys.argv)
     cw = ChartWidget()
     cw.show()

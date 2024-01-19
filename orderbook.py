@@ -1,4 +1,3 @@
-import sys
 import time
 import pybithumb
 from PyQt5 import uic
