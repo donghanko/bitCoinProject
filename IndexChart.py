@@ -22,8 +22,13 @@ class PriceWorker(QThread):
 
     def run(self):
         while self.alive:
-            data = pyupbit.get_current_price(self.ticker)
-            self.dataSent.emit(data)
+            try:
+                data = pyupbit.get_current_price(self.ticker)
+                self.dataSent.emit(data)
+            except Exception as e:
+                print(f"Price Worker에서 오류발생:{e}")
+            time.sleep(1)
+            
 
     def close(self):
         self.alive = False
@@ -67,8 +72,10 @@ class ChartWidget(QWidget):
         # ------------------------------------------
 
     def appendData(self, currPrice):
+
         if len(self.container) ==0:
             high = low = open = currPrice
+
 
         self.container.append(currPrice)
         if (currPrice > max(self.container)):
@@ -82,8 +89,11 @@ class ChartWidget(QWidget):
             self.container.remove(0)
             open = self.container[0]
 
+
+        index = (currPrice-open)/(high-low+1e-3)*100
+
         dt = QDateTime.currentDateTime()
-        self.priceData.append(dt.toMSecsSinceEpoch(), (currPrice-open)/(high-low+1e3)*100)
+        self.priceData.append(dt.toMSecsSinceEpoch(), index)
         self.__updateAxis()
 
     def __updateAxis(self):
