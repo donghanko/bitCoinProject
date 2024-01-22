@@ -82,7 +82,6 @@ class ChartWidget(QWidget):
             self.container.popleft()
             self.open_ = self.container[0]
 
-        print((currPrice-self.open_)/(self.high-self.low+1e-3)*100)
         dt = QDateTime.currentDateTime()
         self.priceData.append(dt.toMSecsSinceEpoch(), (currPrice-self.open_)/(self.high-self.low+1e-3)*100)
         self.__updateAxis()
