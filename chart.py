@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import QWidget
 from PyQt5.QtGui import QPainter
 from PyQt5.QtChart import QLineSeries, QChart, QValueAxis, QDateTimeAxis
 from PyQt5.QtCore import Qt, QDateTime
+from collections import deque
 # ----------------- 추 가 ------------------
 import time
 import pybithumb
@@ -21,7 +22,7 @@ class PriceWorker(QThread):
     def run(self):
         while self.alive:
             data  = pyupbit.get_current_price(self.ticker)
-            time.sleep(1)
+            time.sleep(.1)
             self.dataSent.emit(data)
 
     def close(self):
@@ -33,7 +34,11 @@ class ChartWidget(QWidget):
         super().__init__(parent)
         uic.loadUi("C:\\Users\\dhko23\\PycharmProjects\\uifile\\chart.ui", self)
         self.ticker = ticker
-        self.viewLimit = 128
+        self.viewLimit = 600
+        self.high = 0
+        self.low = 0
+        self.open_ = 0
+        self.container = deque()
 
         self.priceData = QLineSeries()
         self.priceChart = QChart()
@@ -64,12 +69,22 @@ class ChartWidget(QWidget):
         # ------------------------------------------
 
     def appendData(self, currPrice):
-        high = low = close = open = currPrice
+        if len(self.container)==0:
+            self.high = self.low = self.open_ = currPrice
 
+        if (currPrice>self.high):
+            self.high = currPrice
+        if (currPrice<self.low):
+            self.low = currPrice
+        self.container.append(currPrice)
         if len(self.priceData) == self.viewLimit :
             self.priceData.remove(0)
+            self.container.popleft()
+            self.open_ = self.container[0]
+
+        print((currPrice-self.open_)/(self.high-self.low+1e-3)*100)
         dt = QDateTime.currentDateTime()
-        self.priceData.append(dt.toMSecsSinceEpoch(), currPrice)
+        self.priceData.append(dt.toMSecsSinceEpoch(), (currPrice-self.open_)/(self.high-self.low+1e-3)*100)
         self.__updateAxis()
 
     def __updateAxis(self):
